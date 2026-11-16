@@ -1346,7 +1346,7 @@ export const proxyPlugin = (app: Elysia) =>
 
         if (provider.protocol === "deepai") {
           const started = performance.now();
-          const apiModel = (await deepaiModels().catch(() => [])).find((entry) => entry.id === parsed.modelId);
+          const apiModel = (await deepaiModels(credential?.secret).catch(() => [])).find((entry) => entry.id === parsed.modelId);
           const useResponses = apiModel?.api === "openai-responses";
           const deepaiBody = useResponses
             ? requestFromChat("responses", { ...body, model: parsed.modelId, stream: Boolean(body.stream) })

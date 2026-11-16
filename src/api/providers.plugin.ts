@@ -72,7 +72,7 @@ export const providersPlugin = (app: Elysia) =>
             const models = await qwenModels(credential, provider.base_url);
             if (!models.length) throw new Error("Qwen returned no models");
           } else if (protocol === "deepai" && secret) {
-            const models = await deepaiModels();
+            const models = await deepaiModels(secret);
             if (!models.length) throw new Error("DeepAI returned no models");
           } else if (protocol === "deepai") {
             return { valid: true, verified: false, message: "Sign in with DeepAI Code to connect and validate this account." };

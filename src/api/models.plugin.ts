@@ -451,10 +451,20 @@ export const modelsPlugin = (app: Elysia) =>
           }
 
           if (provider.protocol === "deepai") {
+            const credential =
+              credentialService.select(
+                provider.id,
+                provider.credential_mode,
+                provider.fixed_credential_id,
+              ) || credentialService.select(provider.id, provider.credential_mode === "failover" ? "failover" : "round_robin");
+            if (!credential?.secret) {
+              set.status = 503;
+              return { error: "No active DeepAI Code account" };
+            }
             // A model is free when the lane 4 catalog prices it at 0 Theos:
             // per-request "0", all per-second tiers "0", or not premier when
             // the catalog carries no price fields (same rule as the app).
-            const available = (await deepaiModels()).map((model) => ({
+            const available = (await deepaiModels(credential.secret)).map((model) => ({
               ...model,
               id: model.id,
               display_name: model.name,

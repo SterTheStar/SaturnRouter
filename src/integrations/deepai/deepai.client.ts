@@ -78,12 +78,16 @@ function decodeCatalog(payload: any): DeepAIModel[] {
   return available;
 }
 
-export async function deepaiModels(): Promise<DeepAIModel[]> {
+export async function deepaiModels(apiKey?: string): Promise<DeepAIModel[]> {
   if (catalog && Date.now() - catalogAt < 60_000) return catalog;
-  if (catalogRefresh) return catalogRefresh;
-  catalogRefresh = (async () => {
+  if (catalogRefresh && !apiKey) return catalogRefresh;
+  const refresh = (async () => {
     try {
-      const response = await fetch(`${BASE}/models`, { headers: headers(), signal: AbortSignal.timeout(5000), redirect: "error" });
+      const response = await fetch(`${BASE}/models`, {
+        headers: headers(apiKey),
+        signal: AbortSignal.timeout(5000),
+        redirect: "error",
+      });
       if (!response.ok) throw new Error(`DeepAI models failed (${response.status})`);
       catalog = decodeCatalog(await response.json());
       catalogAt = Date.now();
@@ -92,8 +96,11 @@ export async function deepaiModels(): Promise<DeepAIModel[]> {
       if (catalog) return catalog;
       throw error;
     }
-  })().finally(() => { catalogRefresh = null; });
-  return catalogRefresh;
+  })().finally(() => {
+    if (catalogRefresh === refresh) catalogRefresh = null;
+  });
+  catalogRefresh = refresh;
+  return refresh;
 }
 
 async function refreshTheos(apiKey: string): Promise<void> {
