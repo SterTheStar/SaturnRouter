@@ -1,5 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { buildHubUserAgent } from "./antigravity.headers";
+import {
+  buildHubUserAgent,
+  DEFAULT_ANTIGRAVITY_CLIENT_VERSION,
+  DEFAULT_ANTIGRAVITY_HUB_VERSION,
+  generateFingerprint,
+  getImpersonationHeaders,
+  resolveHubUserAgent,
+} from "./antigravity.headers";
 import {
   populateSyntheticArgonModels,
   type AntigravityQuotaGroup,
@@ -7,10 +14,27 @@ import {
 
 describe("Antigravity Quota & Usage Limits", () => {
   it("buildHubUserAgent generates expected format with aidev_client and hub identity", () => {
-    const ua = buildHubUserAgent("2.26.0");
-    expect(ua).toContain("antigravity/hub/2.26.0");
+    const ua = buildHubUserAgent();
+    expect(ua).toContain(`antigravity/hub/${DEFAULT_ANTIGRAVITY_HUB_VERSION}`);
     expect(ua).toContain("(aidev_client; os_type=");
     expect(ua).toContain("arch=");
+  });
+
+  it("resolveHubUserAgent upgrades stale stored user agents and getImpersonationHeaders sends current versions", () => {
+    expect(resolveHubUserAgent("antigravity/hub/2.25.0 linux/x64")).toContain(
+      `antigravity/hub/${DEFAULT_ANTIGRAVITY_HUB_VERSION} (aidev_client;`,
+    );
+    expect(
+      resolveHubUserAgent("antigravity/hub/2.26.0 (aidev_client; os_type=windows; arch=amd64)"),
+    ).toContain(`antigravity/hub/${DEFAULT_ANTIGRAVITY_HUB_VERSION}`);
+
+    const fp = {
+      ...generateFingerprint("user@example.com"),
+      userAgent: "antigravity/hub/2.25.0 linux/x64",
+    };
+    const headers = getImpersonationHeaders("tok", fp);
+    expect(headers["User-Agent"]).toContain(`antigravity/hub/${DEFAULT_ANTIGRAVITY_HUB_VERSION}`);
+    expect(headers["X-Client-Version"]).toBe(DEFAULT_ANTIGRAVITY_CLIENT_VERSION);
   });
 
   it("populateSyntheticArgonModels synthesizes gemini-4-argon-high when argon quota group exists", () => {

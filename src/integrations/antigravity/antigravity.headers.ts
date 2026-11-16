@@ -7,7 +7,36 @@ function stableId(value: string) {
     .slice(0, 16);
 }
 
-export function buildHubUserAgent(version = "2.26.0"): string {
+export const DEFAULT_ANTIGRAVITY_HUB_VERSION = "2.32.1";
+export const DEFAULT_ANTIGRAVITY_CLIENT_VERSION = "2.32.1";
+
+export function getAntigravityHubVersion(): string {
+  return (
+    process.env.ANTIGRAVITY_HUB_VERSION?.trim() ||
+    process.env.FALLBACK_ANTIGRAVITY_VERSION?.trim() ||
+    DEFAULT_ANTIGRAVITY_HUB_VERSION
+  );
+}
+
+export function getAntigravityClientVersion(): string {
+  return (
+    process.env.ANTIGRAVITY_CLIENT_VERSION?.trim() ||
+    DEFAULT_ANTIGRAVITY_CLIENT_VERSION
+  );
+}
+
+function compareSemver(a: string, b: string): number {
+  const pa = a.split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const pb = b.split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+export function buildHubUserAgent(version = getAntigravityHubVersion()): string {
   const platform =
     process.platform === "win32"
       ? "windows"
@@ -16,6 +45,22 @@ export function buildHubUserAgent(version = "2.26.0"): string {
         : "linux";
   const arch = process.arch === "x64" ? "amd64" : process.arch === "arm64" ? "arm64" : process.arch;
   return `antigravity/hub/${version} (aidev_client; os_type=${platform}; arch=${arch})`;
+}
+
+export function resolveHubUserAgent(storedUserAgent?: string | null): string {
+  const targetVersion = getAntigravityHubVersion();
+  if (
+    process.env.ANTIGRAVITY_HUB_VERSION?.trim() ||
+    process.env.FALLBACK_ANTIGRAVITY_VERSION?.trim() ||
+    !storedUserAgent
+  ) {
+    return buildHubUserAgent(targetVersion);
+  }
+  const match = storedUserAgent.match(/^antigravity\/hub\/(\d+\.\d+\.\d+)\s+\(aidev_client;/);
+  if (!match || compareSemver(match[1], targetVersion) < 0) {
+    return buildHubUserAgent(targetVersion);
+  }
+  return storedUserAgent;
 }
 
 export function generateFingerprint(email: string): DeviceFingerprint {
@@ -61,9 +106,9 @@ export function getImpersonationHeaders(
   return {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
-    "User-Agent": fp.userAgent || "antigravity/hub/2.25.0 linux/x64",
+    "User-Agent": resolveHubUserAgent(fp.userAgent),
     "X-Client-Name": "antigravity",
-    "X-Client-Version": "1.110.0",
+    "X-Client-Version": getAntigravityClientVersion(),
     "x-goog-api-client": fp.apiClient || "gl-node/18.18.2 fire/0.8.6 grpc/1.10.x",
     "X-Goog-QuotaUser": fp.quotaUser,
     "X-Client-Device-Id": fp.deviceId,
@@ -79,9 +124,9 @@ export function getGeminiCliHeaders(token: string, fp: DeviceFingerprint) {
   return {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json; charset=utf-8",
-    "User-Agent": fp.cliUserAgent || "antigravity/hub/2.25.0 linux/x64",
+    "User-Agent": fp.cliUserAgent || buildHubUserAgent(),
     "X-Client-Name": "antigravity",
-    "X-Client-Version": "1.110.0",
+    "X-Client-Version": getAntigravityClientVersion(),
     "x-goog-api-client": fp.cliApiClient || "gl-node/22.18.0",
     "X-Goog-QuotaUser": fp.quotaUser,
     "X-Client-Device-Id": fp.deviceId,

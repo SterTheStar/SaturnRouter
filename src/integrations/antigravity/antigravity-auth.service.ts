@@ -1,6 +1,11 @@
 import { credentialService } from "../../services/credential.service";
 import { logger } from "../../logger";
-import { generateFingerprint } from "./antigravity.headers";
+import {
+  buildHubUserAgent,
+  generateFingerprint,
+  getAntigravityClientVersion,
+  resolveHubUserAgent,
+} from "./antigravity.headers";
 import type {
   GoogleTokenResponse,
   DeviceFingerprint,
@@ -67,9 +72,9 @@ export async function discoverProject(token: string): Promise<string> {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
-          "User-Agent": "antigravity/hub/2.25.0 linux/x64",
+          "User-Agent": buildHubUserAgent(),
           "X-Client-Name": "antigravity",
-          "X-Client-Version": "1.110.0",
+          "X-Client-Version": getAntigravityClientVersion(),
         },
         body: JSON.stringify({
           metadata: {
@@ -107,9 +112,9 @@ export async function discoverProject(token: string): Promise<string> {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
-          "User-Agent": "antigravity/hub/2.25.0 linux/x64",
+          "User-Agent": buildHubUserAgent(),
           "X-Client-Name": "antigravity",
-          "X-Client-Version": "1.110.0",
+          "X-Client-Version": getAntigravityClientVersion(),
         },
         body: JSON.stringify({
           tierId,
@@ -252,9 +257,14 @@ export const antigravityAuthService = {
   },
   fingerprint(credential: any): DeviceFingerprint {
     try {
-      return credential.fingerprint_json
-        ? JSON.parse(credential.fingerprint_json)
-        : generateFingerprint(credential.email || credential.id);
+      if (credential.fingerprint_json) {
+        const parsed = JSON.parse(credential.fingerprint_json) as DeviceFingerprint;
+        return {
+          ...parsed,
+          userAgent: resolveHubUserAgent(parsed.userAgent),
+        };
+      }
+      return generateFingerprint(credential.email || credential.id);
     } catch {
       return generateFingerprint(credential.email || credential.id);
     }
